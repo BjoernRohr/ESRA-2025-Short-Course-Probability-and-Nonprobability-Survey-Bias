@@ -21,7 +21,12 @@ Next we load data prepared for the excercieses:
 ```{r Load data}
 load("generated_surveys/survey1_prob.RData")
 load("generated_surveys/survey2_nonprob.RData")
-load("generated_surveys/additional_data.Rdata")
+load("generated_surveys/unobserved1_prob.RData")
+load("generated_surveys/unobserved2_nonprob.RData")
+load("generated_surveys/unobserved1_prob.RData")
+load("generated_surveys/unobserved2_nonprob.RData")
+load("generated_surveys/frame1_prob.RData")
+load("generated_surveys/frame2_nonprob.RData") # normaly this would not exist
 
 ```
 
@@ -76,7 +81,7 @@ How would you interpret the results?
 ```{r, Exercise 3}
 
 ### load a named vector of benchmark means
-load("benchmark.RData")
+load("generated_surveys/benchmark.RData")
 benchmark <- colMeans(mikrozensus)
 
 ### let us also assume that the full_probability survey with 
@@ -169,12 +174,11 @@ plot_multi_compare(c("multi.diff.1", "multi.diff.2"), diff_perc_size = 3, ,plots
 
 ## Exercise 6: Nonresponse weights
 
-Use the response models from Exercise 1 to calculate nonresponse weights as inverse of the fitted values. 
+Use the response models from Exercise 1 to calculate nonresponse weights as inverse of the fitted values.
 
 Investigate the weights regarding their summary and standard deviation.
 
 Use them in sampcompR to univestigate their impact on univariate bias. (take a look in the documentation)
-
 
 ```{r, Exercise 6}
 
@@ -201,11 +205,9 @@ Are there differences between your individual models?
 
 We prepared an example of how you can include raking weights directly calculated by sampcompR in your survey comparison.
 
-Take some time and try it out. 
+Take some time and try it out.
 
 Interpret the results.
-
-
 
 ```{r Excursus}
 
