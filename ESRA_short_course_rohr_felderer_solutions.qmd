@@ -1,0 +1,512 @@
+---
+title: "Representation Bias in Probability and Non-Probability Surveys - Theoretical Considerations and Practical Applications Using the sampcompR R-Package"
+format: html
+editor: visual
+---
+
+# Prepare for Exercises:
+
+First we need to install some needed packages. The most important here is sampcompR, as it plays a prominent role in this course.
+
+```{r Load backages}
+library(sampcompR)
+library(ggplot2)
+library(xtable)
+library(tidyverse)
+library(mice)
+```
+
+Next we load data prepared for the excercieses:
+
+```{r Load data}
+load("generated_surveys/survey1_prob.RData")
+load("generated_surveys/survey2_nonprob.RData")
+load("generated_surveys/unobserved1_prob.RData")
+load("generated_surveys/unobserved2_nonprob.RData")
+load("generated_surveys/unobserved1_prob.RData")
+load("generated_surveys/unobserved2_nonprob.RData")
+load("generated_surveys/frame1_prob.RData")
+load("generated_surveys/frame2_nonprob.RData") # normaly this would not exist
+
+```
+
+# Exercises
+
+## Exercise 1: Response Model
+
+Think about a probability Survey (Survey 1): Which X variables can you use from the frame? Which Y variables do you plan to analyze? Run a model, logistic regression model (nonresponse model) to investigate which variables led to nonresponse and by what extent. Interpret the findings. What do you learn from it?
+
+```{r Exercise 1}
+
+## Ex 1: nonresponse model
+svy1.response <- glm(response ~ age_16to29+age_30to39+age_40to49+
+                     age_50to59+age_60p+german+female,
+                     family = "binomial", data = frame1)
+
+summary(svy1.response)
+
+## Nonresponse model with non-frame variables
+## They would normlly not be available
+
+### As we have only a dataframe with frame we also need to add information
+### that would normaly not be observed
+
+full_prob<-cbind(frame1,unobserved1_prob[,-1])
+
+
+
+svy1.response.unobs <- glm(response ~ age_16to29+age_30to39+age_40to49+
+                             age_50to59+age_60p+german+female+
+                             edu_low+edu_mid+edu_high+usage+
+                             satisfaction+itknowledge+
+                             itliteracy, family = "binomial", data = full_prob)
+summary(svy1.response.unobs)
+
+
+svy1.response.unobs2 <- glm(response ~ age_16to29+age_30to39+age_40to49+
+                             age_50to59+age_60p+german+female+
+                             usage+
+                             satisfaction+itknowledge+
+                             itliteracy, family = "binomial", data = full_prob)
+summary(svy1.response.unobs2)
+
+```
+
+## Exercise 2: R-Indicator
+
+Use the R_indicator function of sampcompR to compute the R-indicator for your survey using frame Information.
+
+What happens to the R-indicator if you drop an inﬂuential X-variable from the nonresponse model?
+
+```{r, Exercise 2}
+
+## if you need a hint try help(R_indicator)
+
+## R indicator based on all frame variables
+R_indicator(dfs=c("frame1"),
+            variables=c("age_30to39","age_40to49","age_50to59",
+                        "age_60p","female","german"),
+            response_identificators = c("response"),
+            get_r2 = T)
+
+## R indicator when some influential variables are not used
+R_indicator(dfs=c("frame1"),
+            variables=c("age_30to39","age_40to49","age_50to59",
+                        "age_60p"),
+            response_identificators = c("response"),
+            get_r2 = T)
+
+
+```
+
+## Exercise 3: Bias in univariate estimates
+
+Install sampcompR from CRAN ( install.packages(sampcompR) )
+
+Use sampcompR to estimate bias in univariate estimates for Survey 1 and Survey 2 (or for your own data if you like).
+
+Plot the results and output them as a table.
+
+How would you interpret the results?
+
+```{r, Exercise 3}
+
+### load a named vector of benchmark means
+load("generated_surveys/benchmark.RData")
+benchmark <- colMeans(mikrozensus)
+
+### let us also assume that the full_probability survey with 
+### no missings is our benchmark survey
+
+benchmark_svy<-full_prob
+
+###################################################
+## benchmark available as named vector of means: ##
+###################################################
+
+## Generate Results
+diff_pop_mic <-  uni_compare(nboots = 0,funct= "d_prop", 
+                              plot_title = "comparison of survey 1 respondents and nonrespondents", 
+                              dfs = c("prob_resp", "nonprob_part"), 
+                              summetric = "avg2",
+                              benchmarks=c("benchmark"), 
+                              variables=c("age_16to29", "age_30to39" ,"age_40to49" ,
+                                          "age_50to59", "age_60p", "german",    
+                                          "female"))
+
+
+## Plot Results
+plot_diff_pop_mic<-plot_uni_compare(diff_pop_mic)
+plot_diff_pop_mic
+
+
+############################################
+## without bootstrap-confidence intervals ##
+############################################
+
+diff_pop_svy <-  uni_compare(nboots = 0,funct= "d_prop", 
+                              plot_title = "comparison of survey 1 respondents and nonrespondents", 
+                              dfs = c("prob_resp", "nonprob_part"), 
+                              summetric = "avg2",
+                              benchmarks=c("benchmark_svy"), 
+                              variables=c("age_16to29", "age_30to39" ,"age_40to49" ,
+                                          "age_50to59", "age_60p", "german",    
+                                          "female"))
+
+## Plot Results
+plot_diff_pop_svy<-plot_uni_compare(diff_pop_svy)
+plot_diff_pop_svy
+
+## Show Results in a Table
+uni_diff_table<-uni_compare_table(diff_pop_svy)
+uni_diff_table
+
+
+####################################
+## bootstrap confidence intervals ##
+####################################
+
+diff_pop_boot <-  uni_compare(nboots = 1000,funct= "d_prop", 
+                              plot_title = "comparison of survey 1 respondents and nonrespondents", 
+                              dfs = c("prob_resp", "nonprob_part"), 
+                              summetric = "avg2",
+                              benchmarks=c("benchmark_svy"), 
+                              variables=c("age_16to29", "age_30to39" ,"age_40to49" ,
+                                          "age_50to59", "age_60p", "german" ,    
+                                          "female","edu_low","edu_mid","edu_high",
+                                          "usage","satisfaction","itknowledge","itliteracy"))
+
+plot_diff_pop_boot<-plot_uni_compare(diff_pop_boot)
+plot_diff_pop_boot
+
+#########################
+## relative difference ##
+#########################
+
+diff_pop_rel <-  uni_compare(nboots = 0,funct= "rel_mean", 
+                              plot_title = "comparison of survey 1 respondents and nonrespondents", 
+                              dfs = c("prob_resp", "nonprob_part"), 
+                              summetric = "avg2",
+                              benchmarks=c("benchmark_svy"), 
+                              variables=c("age_16to29", "age_30to39" ,"age_40to49" ,
+                                          "age_50to59", "age_60p", "german" ,    
+                                          "female","edu_low","edu_mid","edu_high",
+                                          "usage","satisfaction","itknowledge","itliteracy"))
+
+plot_diff_pop_rel<-plot_uni_compare(diff_pop_rel)
+plot_diff_pop_rel
+
+```
+
+## Exercise 4 Bias in bivariate estimates
+
+Use sampcompR to estimate bias in bivariate estimates for survey 1 and survey 2 (or for your own data if you like).
+
+Plot the results.
+
+How would you interpret the results?
+
+```{r Exercise 4}
+
+
+biv.diff <- biv_compare(nboots = 0, dfs = c("prob_resp", "nonprob_part"),
+                        plot_title = "comparison of survey respondents and full sample", 
+            benchmarks=c("benchmark_svy"),
+            diff_perc_size = 2,
+            plots_label = c("Prob", "Nonprob"),
+            variables=c("age_16to29", "age_30to39" ,"age_40to49" ,"age_50to59", 
+                        "age_60p","edu_low", "edu_mid", "edu_high","german" ,
+                        "female", "itknowledge", 
+                        "satisfaction", "usage","itliteracy"))
+
+plot_biv.diff<-plot_biv_compare(biv.diff)
+plot_biv.diff
+
+
+
+```
+
+## Exercise 5 Bias in multivariate estimates
+
+Use sampcompR to estimate bias in multivariate estimates for Survey 1 and Survey 2 (or for your own data if you like).
+
+Plot the results.
+
+How would you interpret he results?
+
+```{r Exercise 5}
+
+
+## multivariate comparison for dataset 1
+multi.diff.1 <-  multi_compare(df="prob_resp", bench="benchmark_svy", 
+              independent = c("age_30to39" ,"age_40to49" , "age_50to59", 
+                              "age_60p" ,"german","female",
+                              "edu_low", "edu_high"), 
+              dependent=c("satisfaction", "itknowledge",
+                          "usage","itliteracy"), 
+              family="ols")
+
+## multivariate comparison for dataset 2
+multi.diff.2 <- multi_compare(df="nonprob_part", 
+                              bench="benchmark_svy",
+                              independent = c("age_30to39","age_40to49","age_50to59",
+                                              "age_60p","german","female", 
+                                              "edu_low", "edu_high"), 
+                                            dependent=c("satisfaction", "itknowledge",
+                                                        "usage","itliteracy"), 
+                                            family="ols")
+
+## Plot multivariate comparison
+plot_multi.diff<-plot_multi_compare(c("multi.diff.1", "multi.diff.2"), diff_perc_size = 3, ,plots_label = c("Probabulity Survey", "Nonprobability Survey"))
+
+plot_multi.diff
+
+
+```
+
+## Exercise 6: Nonresponse weights
+
+Use the response models from Exercise 1 to calculate nonresponse weights as inverse of the fitted values.
+
+Investigate the weights regarding their summary and standard deviation.
+
+Use them in sampcompR to univestigate their impact on univariate bias. (take a look in the documentation)
+
+```{r, Exercise 6}
+
+## Nonresponse weight based on frame information
+svy1.nr.weight.frame <- 1/svy1.response$fitted.values
+summary(svy1.nr.weight.frame)
+sd(svy1.nr.weight.frame)
+
+## Nonresponse weight based also on unobserved variables
+svy1.nr.weight.unobs <- 1/svy1.response.unobs$fitted.values
+summary(svy1.nr.weight.unobs)
+sd(svy1.nr.weight.unobs)
+
+prob_resp<- prob_resp |> 
+  mutate(wgt1 = svy1.nr.weight.frame[full_prob$response==1],
+         wgt2 = svy1.nr.weight.unobs[full_prob$response==1])
+
+##################################
+## applying nonresponse weights ##
+##################################
+
+diff_pop_weighted <-  uni_compare(nboots = 0,funct= "rel_prop", 
+                              plot_title = "comparison of survey 1 respondents and nonrespondents", 
+                              dfs = c("prob_resp", "prob_resp",
+                                      "prob_resp"), 
+                              summetric = "avg2",
+                              benchmarks=c("benchmark_svy"), 
+                              weight = c("wgt1","wgt2",NA),
+                              id = c("ID","ID",NA),
+                              variables=c("age_16to29", "age_30to39" ,"age_40to49" ,
+                                          "age_50to59", "age_60p", "german",    
+                                          "female","edu_low","edu_mid","edu_high",
+                                          "satisfaction", "itknowledge", 
+                                          "itliteracy","usage"),
+                              name_dfs = c("Prop. Weight 1",
+                                           "Prob. Weight 2",
+                                           "Prob. Unweighted"))
+
+plot_diff_pop_weighted<-plot_uni_compare(diff_pop_weighted)
+plot_diff_pop_weighted
+
+diff_pop_weighted2 <-  uni_compare(nboots = 0,funct= "rel_prop", 
+                              plot_title = "comparison of survey 1 respondents and nonrespondents", 
+                              dfs = c("prob_resp", "prob_resp",
+                                      "prob_resp"), 
+                              summetric = "avg2",
+                              benchmarks=c("benchmark_svy"), 
+                              weight = c("wgt1","wgt2",NA),
+                              id = c("ID","ID",NA),
+                              variables=c("edu_low","edu_mid","edu_high",
+                                          "satisfaction", "itknowledge", 
+                                          "itliteracy","usage"),
+                              name_dfs = c("Prop. Weight 1",
+                                           "Prob. Weight 2",
+                                           "Prob. Unweighted"))
+
+plot_diff_pop_weighted2<-plot_uni_compare(diff_pop_weighted2)
+plot_diff_pop_weighted2
+
+
+
+```
+
+## Exercise 7: Correlation of y and nonresponse weights
+
+Determine the correlation of your nonresponse weights and your variables.
+
+Are there differences between your individual models?
+
+```{r Exercise 7}
+
+full_prob$nr.weight.frame <- svy1.nr.weight.frame
+full_prob$nr.weight.unobs <- svy1.nr.weight.unobs
+
+
+cor.frame <- c(cor(as.numeric(as.character(full_prob$german)),
+                   full_prob$nr.weight.frame),
+               cor(as.numeric(as.character(full_prob$female)),
+                   full_prob$nr.weight.frame),
+               cor(full_prob$satisfaction, full_prob$nr.weight.frame),
+               cor(full_prob$itknowledge, full_prob$nr.weight.frame),
+               cor(full_prob$usage , full_prob$nr.weight.frame),
+               cor(full_prob$itliteracy , full_prob$nr.weight.frame))
+
+
+cor.unobs <- c(cor(as.numeric(as.character(full_prob$german)),
+                   full_prob$nr.weight.frame),
+               cor(as.numeric(as.character(full_prob$female)),
+                   full_prob$nr.weight.frame),
+               cor(full_prob$satisfaction, full_prob$nr.weight.unobs),
+               cor(full_prob$itknowledge, full_prob$nr.weight.unobs),
+               cor(full_prob$usage , full_prob$nr.weight.unobs),
+               cor(full_prob$itliteracy , full_prob$nr.weight.unobs))
+
+cor.svy1 <- round(rbind(cor.frame, cor.unobs),digits = 4)
+colnames(cor.svy1)<-c("german","female","satisfaction",
+                      "itknowledge","usage","itliteracy")
+cor.svy1
+
+
+```
+
+## Excursus: Raking weights for nonprobability surveys
+
+We prepared an example of how you can include raking weights directly calculated by sampcompR in your survey comparison.
+
+Take some time and try it out.
+
+Interpret the results.
+
+```{r Excursus }
+
+## a function to prepare weighting targets
+targetlist<-function (target,df,weight=NULL,strata=NULL,id=NULL) {
+  
+  if(is.null(weight)==F) weight<-df[,weight]
+  if(is.null(id)==F) id<-df[,id]
+  if(is.null(id)==T) id<-c(1:nrow(df))
+  if(is.null(strata)==F) strata<-df[,strata]
+  target<-paste0("~",target)
+  
+  design <- survey::svydesign(ids = id, weights = weight, strata = strata, data=df)
+  
+  prop.table(survey::svytable(as.formula(target),design))
+}
+
+
+target_vars<-c("age_16to29", "age_30to39" ,"age_40to49",
+               "age_50to59", "age_60p", "german" ,"female")
+
+
+
+## prepare weighting targets
+targets_svy<-map(target_vars,~targetlist(.,benchmark_svy, 
+                                         id = NULL, 
+                                         weight = NULL,
+                                         strata = NULL))
+names(targets_svy)<-target_vars
+
+
+target_list<-list(targets_svy, targets_svy)
+
+target_vars_list<-list(target_vars,target_vars)
+
+## estimate biases when raking is used
+diff_pop_rake <-  uni_compare(nboots = 0,funct= "rel_prop", 
+                              plot_title = "comparison of survey 1 respondents and nonrespondents", 
+                              dfs = c("prob_resp", "nonprob_part"), 
+                              summetric = "avg2",
+                              benchmarks=c("benchmark_svy"), 
+                              variables=c("edu_low","edu_mid","edu_high",
+                                          "satisfaction", "itknowledge", 
+                                          "itliteracy","usage"),
+                              adjustment_weighting = "raking",
+                              adjustment_vars = target_vars_list,
+                              raking_targets = target_list)
+
+plot_diff_pop_rake<-plot_uni_compare(diff_pop_rake)
+plot_diff_pop_rake
+
+
+diff_pop <-  uni_compare(nboots = 0,funct= "rel_prop", 
+                              plot_title = "comparison of survey 1 respondents and nonrespondents", 
+                              dfs = c("prob_resp", "nonprob_part"), 
+                              summetric = "avg2",
+                              benchmarks=c("benchmark_svy"), 
+                              variables=c("edu_low","edu_mid","edu_high",
+                                          "satisfaction", "itknowledge", 
+                                          "itliteracy","usage"))
+
+plot_diff_pop<-plot_uni_compare(diff_pop)
+plot_diff_pop
+
+
+```
+
+```{r, save results}
+library(ggplot2)
+
+ggsave("plots/1. Bias_vs_population.jpg",
+       plot_diff_pop_mic,units="px",
+       width = 2500,
+       height = 1750)
+
+ggsave("plots/2. Bias_vs_population_svy.jpg",
+       plot_diff_pop_svy,units="px",
+       width = 2500,
+       height = 1750)
+
+ggsave("plots/3. Bias_vs_population_svy_boot.jpg",
+       plot_diff_pop_boot,units="px",
+       width = 2500,
+       height = 1750)
+
+ggsave("plots/4. Bias_vs_population_svy_boot.jpg",
+       plot_diff_pop_rel,units="px",
+       width = 2500,
+       height = 1750)
+
+
+
+ggsave("plots/5. Biv_Bias_vs_population_svy.jpg",
+       plot_biv.diff,units="px",
+       width = 2500,
+       height = 1750)
+
+ggsave("plots/6. Multi_Bias_vs_population_svy.jpg",
+       plot_multi.diff,units="px",
+       width = 1550,
+       height = 1200)
+
+
+
+ggsave("plots/7. Bias_vs_population_svy_NRWeighted_frame.jpg",
+       plot_diff_pop_weighted,units="px",
+       width = 2500,
+       height = 1750)
+
+
+
+ggsave("plots/8. Bias_vs_population_svy_NRWeighted_unobserved.jpg",
+       plot_diff_pop_weighted2,units="px",
+       width = 2500,
+       height = 1750)
+
+
+ggsave("plots/9. Bias_vs_population_svy_raked.jpg",
+       plot_diff_pop_rake,units="px",
+       width = 2500,
+       height = 1750)
+
+ggsave("plots/10. Bias_vs_population_svy_nonraked_vars.jpg",
+       plot_diff_pop,units="px",
+       width = 2500,
+       height = 1750)
+
+
+
+```
